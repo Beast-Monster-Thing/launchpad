@@ -423,8 +423,8 @@
 // ═══════════════════════════════════════════════════════════════════
 // ✅ CONFIGURATION — Replace these two values with your Supabase project
 // ═══════════════════════════════════════════════════════════════════
-const SUPABASE_URL      = 'https://vthaycakuraqamwodtub.supabase.co';       // e.g. https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = 'sb_publishable_IrCmnGdTYu_W12nvnmkLCg_PW82IPVP';  // long "anon public" key
+const SUPABASE_URL      = 'YOUR_SUPABASE_URL';       // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';  // long "anon public" key
 // ═══════════════════════════════════════════════════════════════════
 
 const PLACEHOLDER = SUPABASE_URL === 'YOUR_SUPABASE_URL';
@@ -720,7 +720,9 @@ function closeModal() {
 }
 
 async function saveTile() {
-  const url    = document.getElementById('urlInput').value.trim();
+  let url      = document.getElementById('urlInput').value.trim();
+  // Ensure the URL is absolute so it doesn't resolve relative to the page
+  if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
   const imgData = pendingImg || (editingIndex !== null ? tiles[editingIndex].imgData : null);
   const notice = document.getElementById('notice');
   const btn    = document.getElementById('btnSave');
