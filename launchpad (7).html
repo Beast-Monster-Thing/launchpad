@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Launchpad</title>
+<link href="https://fonts.googleapis.com/css2?family=Linux+Libertine+O&family=Linux+Biolinum+O&display=swap" rel="stylesheet">
+
+<!-- ✅ STEP 1: Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Linux Biolinum O', 'Liberation Sans', Georgia, serif;
+    background: #f8f9fa;
+    color: #202122;
+    min-height: 100vh;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    max-width: 960px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid #a2a9b1;
+    padding-bottom: 0.3rem;
+    gap: 1rem;
+  }
+
+  h1 {
+    font-family: 'Linux Libertine O', 'Linux Libertine', Georgia, 'Times New Roman', serif;
+    font-size: 1.95rem;
+    font-weight: normal;
+    color: #000;
+    white-space: nowrap;
+  }
+
+  .user-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #54595d;
+    flex-shrink: 0;
+  }
+
+  .user-bar .username { color: #0645ad; font-weight: 600; }
+
+  .btn-link {
+    background: none;
+    border: none;
+    color: #0645ad;
+    cursor: pointer;
+    font-family: 'Linux Biolinum O', sans-serif;
+    font-size: 13px;
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  .btn-link:hover { color: #0b0080; }
+
+  /* ── Grid ── */
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 960px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  .tile {
+    border: 1px solid #a2a9b1;
+    background: #fff;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .tile:hover { border-color: #54595d; }
+
+  .tile.filled img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 950px;
+  }
+
+  .tile-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    transition: background 0.15s;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 5px;
+  }
+
+  .tile.filled:hover .tile-overlay { background: rgba(0,0,0,0.07); }
+
+  .tile-edit-btn {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid #a2a9b1;
+    font-family: 'Linux Biolinum O', sans-serif;
+    font-size: 11px;
+    color: #0645ad;
+    padding: 2px 7px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1.6;
+  }
+
+  .tile.filled:hover .tile-edit-btn { opacity: 1; }
+
+  .tile.upload-tile {
+    background: #eaecf0;
+    border: 1px solid #a2a9b1;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 140px;
+    height: 100px;
+    cursor: pointer;
+    line-height: normal;
+  }
+
+  .tile.upload-tile:hover { background: #d8d9db; border-color: #54595d; }
+
+  .upload-icon { color: #54595d; text-align: center; }
+  .upload-icon svg { width: 24px; height: 24px; display: block; margin: 0 auto 4px; }
+  .upload-tile-label { font-size: 12px; color: #202122; }
+
+  /* ── Shared Modal Base ── */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    padding: 1rem;
+  }
+
+  .overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: #fff;
+    border: 1px solid #a2a9b1;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.28);
+  }
+
+  .modal-header {
+    background: #eaecf0;
+    border-bottom: 1px solid #a2a9b1;
+    padding: 0.55rem 1rem;
+    font-family: 'Linux Libertine O', Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: normal;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-body {
+    padding: 1.1rem 1.1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .field label {
+    display: block;
+    font-size: 12.5px;
+    color: #54595d;
+    margin-bottom: 4px;
+  }
+
+  .field input[type="url"],
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="password"] {
+    width: 100%;
+    border: 1px solid #a2a9b1;
+    padding: 0.4rem 0.6rem;
+    font-family: 'Linux Biolinum O', sans-serif;
+    font-size: 13.5px;
+    color: #202122;
+    background: #fff;
+    outline: none;
+  }
+
+  .field input:focus { border-color: #3680b0; }
+
+  .img-drop-area {
+    border: 1px dashed #a2a9b1;
+    background: #f8f9fa;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.1s, border-color 0.1s;
+  }
+
+  .img-drop-area:hover, .img-drop-area.drag { background: #eaf3fb; border-color: #3680b0; }
+
+  .img-drop-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-preview {
+    max-width: 100%;
+    max-height: 80px;
+    width: auto;
+    height: auto;
+    display: none;
+    margin: 0 auto 7px;
+    border: 1px solid #a2a9b1;
+  }
+
+  .drop-text { font-size: 12.5px; color: #54595d; }
+  .drop-text a { color: #0645ad; text-decoration: underline; cursor: pointer; }
+
+  .modal-footer {
+    border-top: 1px solid #a2a9b1;
+    padding: 0.6rem 1.1rem;
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    align-items: center;
+    background: #f8f9fa;
+  }
+
+  .notice { font-size: 12px; color: #b32424; font-style: italic; margin-right: auto; }
+  .notice.success { color: #2a7a2a; }
+
+  .btn {
+    font-family: 'Linux Biolinum O', sans-serif;
+    font-size: 13px;
+    padding: 4px 13px;
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+    color: #202122;
+    cursor: pointer;
+    line-height: 1.6;
+  }
+
+  .btn:hover { background: #e8e9ea; }
+  .btn.primary { background: #3680b0; color: #fff; border-color: #2c6a94; }
+  .btn.primary:hover { background: #2c6a94; }
+  .btn.danger { color: #b32424; border-color: #c0c0c0; }
+  .btn.danger:hover { background: #fef6f6; border-color: #b32424; }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  /* ── Auth Modal ── */
+  #authOverlay { z-index: 200; }
+
+  .auth-tabs {
+    display: flex;
+    border-bottom: 1px solid #a2a9b1;
+    background: #eaecf0;
+  }
+
+  .auth-tab {
+    flex: 1;
+    padding: 0.55rem 1rem;
+    font-family: 'Linux Libertine O', Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: normal;
+    color: #54595d;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.1s, border-color 0.1s;
+    text-align: left;
+  }
+
+  .auth-tab.active {
+    color: #000;
+    border-bottom-color: #3680b0;
+    background: #fff;
+  }
+
+  .auth-tab:hover:not(.active) { color: #202122; background: #d8d9db; }
+
+  .auth-hint {
+    font-size: 12px;
+    color: #54595d;
+    line-height: 1.5;
+    background: #f8f9fa;
+    border: 1px solid #eaecf0;
+    padding: 0.5rem 0.7rem;
+  }
+
+  /* ── Config banner ── */
+  .config-banner {
+    max-width: 960px;
+    margin: 0 auto 1rem;
+    background: #fef3cd;
+    border: 1px solid #f0ad4e;
+    padding: 0.6rem 1rem;
+    font-size: 12.5px;
+    color: #7a5500;
+    display: none;
+  }
+  .config-banner.visible { display: block; }
+  .config-banner code {
+    background: rgba(0,0,0,0.07);
+    padding: 1px 4px;
+    font-size: 11.5px;
+  }
+
+  /* ── Empty state ── */
+  .empty-hint {
+    font-size: 13px;
+    color: #72777d;
+    font-style: italic;
+    max-width: 960px;
+    margin: 0.5rem auto 0;
+  }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1>Launchpad</h1>
+  <div class="user-bar" id="userBar"></div>
+</div>
+
+<!-- Config banner shown when placeholder keys are detected -->
+<div class="config-banner" id="configBanner">
+  ⚠️ Supabase is not configured. Open this file and replace
+  <code>YOUR_SUPABASE_URL</code> and <code>YOUR_SUPABASE_ANON_KEY</code>
+  with your project credentials. See the tutorial for details.
+</div>
+
+<div class="grid" id="grid"></div>
+<p class="empty-hint" id="emptyHint" style="display:none">No tiles yet — click "Upload image" to add your first one.</p>
+
+<!-- ── Auth Modal ── -->
+<div class="overlay open" id="authOverlay">
+  <div class="modal">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin"    onclick="switchTab('login')">Sign in</button>
+      <button class="auth-tab"        id="tabRegister" onclick="switchTab('register')">Create account</button>
+    </div>
+    <div class="modal-body" id="authBody" style="display:flex;flex-direction:column;gap:0.9rem;"></div>
+    <div class="modal-footer">
+      <span class="notice" id="authNotice"></span>
+      <button class="btn primary" id="authSubmitBtn" onclick="submitAuth()">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tile Edit Modal ── -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modalHeader">Add image tile</span>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Image</label>
+        <div class="img-drop-area" id="dropArea">
+          <input type="file" id="fileInput" accept="image/*">
+          <img id="dropPreview" class="drop-preview" src="" alt="">
+          <p class="drop-text" id="dropText"><a>Choose an image</a> or drag it here</p>
+        </div>
+      </div>
+      <div class="field">
+        <label>Destination URL</label>
+        <input type="url" id="urlInput" placeholder="https://example.com">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="notice" id="notice"></span>
+      <button class="btn danger"   id="btnDelete" style="display:none" onclick="deleteSlot()">Remove tile</button>
+      <button class="btn"          onclick="closeModal()">Cancel</button>
+      <button class="btn primary"  id="btnSave" onclick="saveTile()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// ✅ CONFIGURATION — Replace these two values with your Supabase project
+// ═══════════════════════════════════════════════════════════════════
+const SUPABASE_URL      = 'https://vthaycakuraqamwodtub.supabase.co';       // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = 'sb_publishable_IrCmnGdTYu_W12nvnmkLCg_PW82IPVP';  // long "anon public" key
+// ═══════════════════════════════════════════════════════════════════
+
+const PLACEHOLDER = SUPABASE_URL === 'YOUR_SUPABASE_URL';
+
+// Show config banner if not yet set up
+if (PLACEHOLDER) {
+  document.getElementById('configBanner').classList.add('visible');
+}
+
+// ── Init Supabase client ──
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── State ──
+let currentUser  = null;   // Supabase User object
+let tiles        = [];
+let editingIndex = null;
+let pendingImg   = null;   // base64 data URI of newly chosen image
+let authMode     = 'login';
+
+// ─────────────────────────────────────────────
+// User bar
+// ─────────────────────────────────────────────
+function renderUserBar() {
+  const bar = document.getElementById('userBar');
+  if (currentUser) {
+    const label = currentUser.user_metadata?.username || currentUser.email?.split('@')[0];
+    bar.innerHTML = `
+      Signed in as <span class="username">${escHtml(label)}</span>
+      <span style="color:#a2a9b1">·</span>
+      <button class="btn-link" onclick="signOut()">Sign out</button>`;
+  } else {
+    bar.innerHTML = '';
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────
+// Auth UI
+// ─────────────────────────────────────────────
+// Supabase requires an email address internally — we synthesise one from the
+// username so the user never has to type or know about it.
+function fakeEmail(username) {
+  return `${username.toLowerCase()}@launchpad.local`;
+}
+
+function buildAuthBody() {
+  const isLogin = authMode === 'login';
+  document.getElementById('authBody').innerHTML = `
+    ${!isLogin ? `<p class="auth-hint">Your account is stored securely in the cloud. Sign in from any device to access your tiles.</p>` : ''}
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="authUser" placeholder="e.g. alice" autocomplete="username" maxlength="40">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="authPass" placeholder="••••••••" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
+    </div>
+    ${!isLogin ? `<div class="field">
+      <label>Confirm password</label>
+      <input type="password" id="authPass2" placeholder="••••••••" autocomplete="new-password">
+    </div>` : ''}`;
+  document.getElementById('authSubmitBtn').textContent = isLogin ? 'Sign in' : 'Create account';
+  document.getElementById('authNotice').textContent = '';
+  setTimeout(() => document.getElementById('authUser')?.focus(), 80);
+}
+
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
+  buildAuthBody();
+}
+
+async function submitAuth() {
+  if (PLACEHOLDER) {
+    document.getElementById('authNotice').textContent = 'Configure your Supabase credentials first.';
+    return;
+  }
+
+  const notice   = document.getElementById('authNotice');
+  const username = (document.getElementById('authUser')?.value || '').trim().toLowerCase();
+  const password = document.getElementById('authPass')?.value || '';
+  const btn      = document.getElementById('authSubmitBtn');
+
+  notice.textContent = '';
+  notice.className = 'notice';
+
+  if (!username) { notice.textContent = 'Please enter a username.'; return; }
+  if (!/^[a-z0-9_\-.]{1,40}$/.test(username)) {
+    notice.textContent = 'Username may only contain letters, numbers, _, - or .'; return;
+  }
+  if (password.length < 6) { notice.textContent = 'Password must be at least 6 characters.'; return; }
+
+  const email = fakeEmail(username);
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${authMode === 'login' ? 'Signing in…' : 'Creating account…'}`;
+
+  try {
+    if (authMode === 'login') {
+      // ── Sign in ──
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        // Translate generic Supabase errors into username-centric messages
+        if (error.message.toLowerCase().includes('invalid login')) {
+          notice.textContent = 'Incorrect username or password.';
+        } else {
+          notice.textContent = error.message;
+        }
+        return;
+      }
+      await onSignedIn(data.user);
+
+    } else {
+      // ── Register ──
+      const pass2 = document.getElementById('authPass2')?.value || '';
+      if (password !== pass2) { notice.textContent = 'Passwords do not match.'; return; }
+
+      const { data, error } = await sb.auth.signUp({
+        email,
+        password,
+        options: { data: { username } }
+      });
+      if (error) {
+        if (error.message.toLowerCase().includes('already registered')) {
+          notice.textContent = 'That username is already taken.';
+        } else {
+          notice.textContent = error.message;
+        }
+        return;
+      }
+
+      // With email confirmation disabled (recommended), session is returned immediately
+      if (data.user && data.session) {
+        await onSignedIn(data.user);
+      } else {
+        // Fallback: shouldn't happen if email confirmation is off
+        notice.className = 'notice success';
+        notice.textContent = 'Account created! You can now sign in.';
+        switchTab('login');
+      }
+    }
+  } catch (err) {
+    notice.textContent = 'Unexpected error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Sign in' : 'Create account';
+  }
+}
+
+async function onSignedIn(user) {
+  currentUser = user;
+  tiles = await fetchTiles(user.id);
+  document.getElementById('authOverlay').classList.remove('open');
+  renderUserBar();
+  render();
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null;
+  tiles = [];
+  renderUserBar();
+  render();
+  switchTab('login');
+  buildAuthBody();
+  document.getElementById('authOverlay').classList.add('open');
+}
+
+// ─────────────────────────────────────────────
+// Supabase tile data (table: tiles)
+//   Columns: id (uuid pk), user_id (uuid), url (text), img_data (text), created_at
+// ─────────────────────────────────────────────
+async function fetchTiles(userId) {
+  const { data, error } = await sb
+    .from('tiles')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+  if (error) { console.error('fetchTiles error:', error); return []; }
+  // Normalise to { id, url, imgData }
+  return (data || []).map(r => ({ id: r.id, url: r.url, imgData: r.img_data }));
+}
+
+async function insertTile(userId, url, imgData) {
+  const { data, error } = await sb
+    .from('tiles')
+    .insert([{ user_id: userId, url, img_data: imgData }])
+    .select()
+    .single();
+  if (error) throw error;
+  return { id: data.id, url: data.url, imgData: data.img_data };
+}
+
+async function updateTile(tileId, url, imgData) {
+  const { error } = await sb
+    .from('tiles')
+    .update({ url, img_data: imgData })
+    .eq('id', tileId);
+  if (error) throw error;
+}
+
+async function deleteTile(tileId) {
+  const { error } = await sb.from('tiles').delete().eq('id', tileId);
+  if (error) throw error;
+}
+
+// ─────────────────────────────────────────────
+// Tile rendering
+// ─────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById('grid');
+  const hint = document.getElementById('emptyHint');
+  grid.innerHTML = '';
+
+  if (!currentUser) { hint.style.display = 'none'; return; }
+
+  tiles.forEach((t, i) => {
+    const a = document.createElement('a');
+    a.className = 'tile filled';
+    a.href = t.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+
+    const img = document.createElement('img');
+    img.src = t.imgData;
+    img.alt = '';
+
+    const ov  = document.createElement('div');
+    ov.className = 'tile-overlay';
+
+    const eb  = document.createElement('button');
+    eb.className = 'tile-edit-btn';
+    eb.textContent = 'edit';
+    eb.onclick = e => { e.preventDefault(); e.stopPropagation(); openModal(i); };
+
+    ov.appendChild(eb);
+    a.appendChild(img);
+    a.appendChild(ov);
+    grid.appendChild(a);
+  });
+
+  // Upload button
+  const up = document.createElement('div');
+  up.className = 'tile upload-tile';
+  up.onclick = () => openModal(null);
+  up.innerHTML = `
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/>
+        <line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>
+      </svg>
+      <span class="upload-tile-label">Upload image</span>
+    </div>`;
+  grid.appendChild(up);
+
+  hint.style.display = tiles.length === 0 ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────
+// Tile modal
+// ─────────────────────────────────────────────
+function openModal(index) {
+  editingIndex = index;
+  pendingImg = null;
+  document.getElementById('notice').textContent = '';
+  document.getElementById('urlInput').value = index !== null ? tiles[index].url : '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('dropPreview').style.display = 'none';
+  document.getElementById('dropText').innerHTML = '<a>Choose an image</a> or drag it here';
+  document.getElementById('btnDelete').style.display = index !== null ? 'inline-block' : 'none';
+  document.getElementById('modalHeader').textContent = index !== null ? 'Edit tile' : 'Add image tile';
+
+  if (index !== null && tiles[index].imgData) {
+    document.getElementById('dropPreview').src = tiles[index].imgData;
+    document.getElementById('dropPreview').style.display = 'block';
+    document.getElementById('dropText').innerHTML = '<a>Change image</a>';
+  }
+
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(() => document.getElementById('urlInput').focus(), 80);
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  editingIndex = null;
+  pendingImg = null;
+}
+
+async function saveTile() {
+  const url    = document.getElementById('urlInput').value.trim();
+  const imgData = pendingImg || (editingIndex !== null ? tiles[editingIndex].imgData : null);
+  const notice = document.getElementById('notice');
+  const btn    = document.getElementById('btnSave');
+
+  if (!imgData) { notice.textContent = 'Please choose an image.'; return; }
+  if (!url)     { notice.textContent = 'Please enter a URL.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Saving…';
+  notice.textContent = '';
+
+  try {
+    if (editingIndex !== null) {
+      // Update existing
+      await updateTile(tiles[editingIndex].id, url, imgData);
+      tiles[editingIndex] = { ...tiles[editingIndex], url, imgData };
+    } else {
+      // Insert new
+      const newTile = await insertTile(currentUser.id, url, imgData);
+      tiles.push(newTile);
+    }
+    render();
+    closeModal();
+  } catch (err) {
+    notice.textContent = 'Save failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  }
+}
+
+async function deleteSlot() {
+  if (editingIndex === null) return;
+  const tileId = tiles[editingIndex].id;
+  try {
+    await deleteTile(tileId);
+    tiles.splice(editingIndex, 1);
+    render();
+    closeModal();
+  } catch (err) {
+    document.getElementById('notice').textContent = 'Delete failed: ' + err.message;
+  }
+}
+
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    pendingImg = ev.target.result;
+    const prev = document.getElementById('dropPreview');
+    prev.src = pendingImg;
+    prev.style.display = 'block';
+    document.getElementById('dropText').innerHTML = '<a>Change image</a>';
+  };
+  r.readAsDataURL(file);
+}
+
+// ─────────────────────────────────────────────
+// Event wiring
+// ─────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => loadFile(e.target.files[0]));
+
+const dropArea = document.getElementById('dropArea');
+dropArea.addEventListener('dragover',  e => { e.preventDefault(); dropArea.classList.add('drag'); });
+dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag'));
+dropArea.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('drag'); loadFile(e.dataTransfer.files[0]); });
+
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) closeModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const authOpen = document.getElementById('authOverlay').classList.contains('open');
+    const tileOpen = document.getElementById('overlay').classList.contains('open');
+    if (authOpen) submitAuth();
+    else if (tileOpen) saveTile();
+  }
+  if (e.key === 'Escape') closeModal();
+});
+
+// ─────────────────────────────────────────────
+// Boot — restore session from Supabase
+// ─────────────────────────────────────────────
+(async function boot() {
+  buildAuthBody();
+
+  if (PLACEHOLDER) {
+    render();
+    return;
+  }
+
+  // Check for an existing session on page load only
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    await onSignedIn(session.user);
+  } else {
+    render();
+  }
+
+  // Only use onAuthStateChange for token refresh — not for driving UI
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'TOKEN_REFRESHED' && session?.user && currentUser) {
+      currentUser = session.user;
+    }
+  });
+})();
+</script>
+</body>
+</html>
